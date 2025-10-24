@@ -7,7 +7,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddScoped<IReviewScraper, GoogleReviewScraperV2>();
+builder.Services.AddScoped<IReviewScraper, GoogleReviewScraper>();
 
 builder.Services.AddLogging(logging =>
 {
