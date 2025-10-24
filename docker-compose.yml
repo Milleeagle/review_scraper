@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  google-places-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5291:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

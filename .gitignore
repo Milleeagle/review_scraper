@@ -1,0 +1,84 @@
+# .NET build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# Rider
+.idea/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Caches
+*.cache
+StyleCopReport.xml
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Temp files
+*.tmp
+*.temp
+*.log
+*.stackdump
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Screenshots from debugging
+/tmp/debug_screenshot_*.png
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# ChromeDriver logs
+chromedriver.log
+
+# Docker
+docker-compose.override.yml
