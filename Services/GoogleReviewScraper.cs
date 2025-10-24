@@ -262,6 +262,65 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
         return reviews;
     }
 
+    private DateTime ParseRelativeTime(string relativeTime)
+    {
+        var now = DateTime.Now;
+        var lowerTime = relativeTime.ToLower();
+
+        try
+        {
+            // Handle "a [unit] ago" / "an [unit] ago" / "ett [unit] sedan" (e.g., "a month ago", "ett år sedan")
+            if (Regex.IsMatch(lowerTime, @"\b(a|an|en|ett)\s+(second|sekund|minute|minut|hour|timme|day|dag|week|vecka|month|månad|year|år)", RegexOptions.IgnoreCase))
+            {
+                var result = now;
+                if (lowerTime.Contains("second") || lowerTime.Contains("sekund")) result = now.AddSeconds(-1);
+                else if (lowerTime.Contains("minute") || lowerTime.Contains("minut")) result = now.AddMinutes(-1);
+                else if (lowerTime.Contains("hour") || lowerTime.Contains("timme")) result = now.AddHours(-1);
+                else if (lowerTime.Contains("day") || lowerTime.Contains("dag")) result = now.AddDays(-1);
+                else if (lowerTime.Contains("week") || lowerTime.Contains("vecka")) result = now.AddDays(-7);
+                else if (lowerTime.Contains("month") || lowerTime.Contains("månad")) result = now.AddMonths(-1);
+                else if (lowerTime.Contains("year") || lowerTime.Contains("år")) result = now.AddYears(-1);
+
+                _logger.LogDebug("Parsed single unit '{RelativeTime}' to {Time}", relativeTime, result);
+                return result;
+            }
+
+            // Pattern: "X [unit] ago" or "för X [unit] sedan" (Swedish)
+            // Support both singular and plural: year/years/år, month/months/månad/månader, etc.
+            // Match variations: "3 months ago", "för 3 månader sedan", "3 days ago"
+            var match = Regex.Match(lowerTime, @"(\d+)\s*(second|sekund|minute|minut|hour|timme|timmar|day|dag|dagar|week|vecka|veckor|month|månad|månader|year|år)s?\b", RegexOptions.IgnoreCase);
+
+            if (match.Success)
+            {
+                var value = int.Parse(match.Groups[1].Value);
+                var unit = match.Groups[2].Value.ToLower();
+
+                var result = unit switch
+                {
+                    var u when u.Contains("second") || u.Contains("sekund") => now.AddSeconds(-value),
+                    var u when u.Contains("minute") || u.Contains("minut") => now.AddMinutes(-value),
+                    var u when u.Contains("hour") || u.Contains("timme") || u.Contains("timmar") => now.AddHours(-value),
+                    var u when u.Contains("day") || u.Contains("dag") => now.AddDays(-value),
+                    var u when u.Contains("week") || u.Contains("vecka") || u.Contains("veckor") => now.AddDays(-value * 7),
+                    var u when u.Contains("month") || u.Contains("månad") || u.Contains("månader") => now.AddMonths(-value),
+                    var u when u.Contains("year") || u.Contains("år") => now.AddYears(-value),
+                    _ => now
+                };
+
+                _logger.LogDebug("Parsed '{RelativeTime}' ({Value} {Unit}) to {Time}", relativeTime, value, unit, result);
+                return result;
+            }
+
+            _logger.LogWarning("Could not parse relative time: '{RelativeTime}'", relativeTime);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse relative time '{RelativeTime}'", relativeTime);
+        }
+
+        return now;
+    }
+
     private Review? ExtractReview(IWebElement element)
     {
         try
@@ -319,8 +378,12 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
             {
                 var timeElement = element.FindElement(By.CssSelector(".rsqaWe"));
                 review.RelativeTime = timeElement.Text.Trim();
+                review.Time = ParseRelativeTime(review.RelativeTime);
             }
-            catch { }
+            catch
+            {
+                review.Time = DateTime.Now; // Fallback if parsing fails
+            }
 
             // Extract business response if exists
             try
@@ -330,7 +393,6 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
             }
             catch { }
 
-            review.Time = DateTime.Now;
             review.Language = "en";
 
             return review;
