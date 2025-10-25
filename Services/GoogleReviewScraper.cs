@@ -9,43 +9,37 @@ namespace GooglePlacesScraper.Services;
 
 public class GoogleReviewScraper : IReviewScraper, IDisposable
 {
-    private readonly IWebDriver _driver;
-    private readonly WebDriverWait _wait;
+    private readonly IChromeDriverPool _driverPool;
+    private IWebDriver? _driver;
+    private WebDriverWait? _wait;
     private readonly ILogger<GoogleReviewScraper> _logger;
     private bool _disposed = false;
 
-    public GoogleReviewScraper(ILogger<GoogleReviewScraper> logger)
+    public GoogleReviewScraper(ILogger<GoogleReviewScraper> logger, IChromeDriverPool driverPool)
     {
         _logger = logger;
+        _driverPool = driverPool;
+    }
 
-        var options = new ChromeOptions();
-        options.AddArguments(
-            "--headless",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--window-size=1920,1080",
-            "--disable-blink-features=AutomationControlled",
-            "--lang=en-US",
-            // Safe performance optimizations
-            "--disable-extensions",
-            "--disable-plugins"
-        );
-
-        _driver = new ChromeDriver(options);
-        _driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(15);
-        _wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
+    private void EnsureDriver()
+    {
+        if (_driver == null)
+        {
+            _driver = _driverPool.RentDriver();
+            _wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
+        }
     }
 
     public async Task<List<Review>> ScrapeReviewsAsync(string googleMapsUrl, ScrapingOptions? options = null)
     {
+        EnsureDriver();
         options ??= new ScrapingOptions();
         var reviews = new List<Review>();
 
         try
         {
             _logger.LogInformation("Navigating to: {Url}", googleMapsUrl);
-            _driver.Navigate().GoToUrl(googleMapsUrl);
+            _driver!.Navigate().GoToUrl(googleMapsUrl);
 
             // Wait for page body to be present
             try
@@ -406,6 +400,7 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
 
     public async Task<Company?> SearchCompanyAsync(string companyName, string? location = null)
     {
+        EnsureDriver();
         try
         {
             var searchQuery = string.IsNullOrEmpty(location)
@@ -413,13 +408,13 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
                 : $"{companyName} {location}";
 
             var searchUrl = $"https://www.google.com/maps/search/{Uri.EscapeDataString(searchQuery)}";
-            _driver.Navigate().GoToUrl(searchUrl);
+            _driver!.Navigate().GoToUrl(searchUrl);
             await Task.Delay(3000);
 
             var company = new Company
             {
                 Name = companyName,
-                GoogleMapsUrl = _driver.Url
+                GoogleMapsUrl = _driver!.Url
             };
 
             return company;
@@ -444,9 +439,10 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
 
     public async Task<Company?> ExtractCompanyInfoAsync(string googleMapsUrl)
     {
+        EnsureDriver();
         try
         {
-            _driver.Navigate().GoToUrl(googleMapsUrl);
+            _driver!.Navigate().GoToUrl(googleMapsUrl);
             await Task.Delay(2000);
 
             var company = new Company
@@ -510,8 +506,11 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
     {
         if (!_disposed)
         {
-            _driver?.Quit();
-            _driver?.Dispose();
+            if (_driver != null)
+            {
+                _driverPool.ReturnDriver(_driver);
+                _driver = null;
+            }
             _disposed = true;
         }
     }

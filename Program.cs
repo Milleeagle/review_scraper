@@ -7,6 +7,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Chrome driver pooling for better performance
+builder.Services.AddSingleton<IChromeDriverPool, ChromeDriverPool>();
 builder.Services.AddScoped<IReviewScraper, GoogleReviewScraper>();
 
 builder.Services.AddLogging(logging =>
