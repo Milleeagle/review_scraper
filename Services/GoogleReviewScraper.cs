@@ -131,6 +131,27 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
         }
     }
 
+    private string ConvertPlaceIdToUrl(string input)
+    {
+        // If it's already a URL, return as-is
+        if (input.StartsWith("http://") || input.StartsWith("https://"))
+        {
+            return input;
+        }
+
+        // If it looks like a Place ID, convert to Google Maps URL
+        // Place IDs typically start with ChIJ or other prefixes and don't contain slashes
+        if (!input.Contains("/") && !input.Contains("?"))
+        {
+            _logger.LogInformation("Converting Place ID '{PlaceId}' to Google Maps URL", input);
+            // Use the direct place URL format which works better for scraping
+            return $"https://www.google.com/maps/place/?q=place_id:{input}";
+        }
+
+        // Otherwise assume it's already a URL without protocol
+        return input.StartsWith("www.") ? $"https://{input}" : input;
+    }
+
     private async Task ClickReviewsTab()
     {
         try
@@ -677,6 +698,84 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error extracting company info");
+            return null;
+        }
+    }
+
+    public async Task<Company?> ScrapeReviewsByPlaceIdAsync(string placeId, ScrapingOptions? options = null)
+    {
+        try
+        {
+            _logger.LogInformation("Scraping reviews for Place ID: {PlaceId}", placeId);
+
+            // Convert Place ID to Google Maps URL
+            var placeUrl = ConvertPlaceIdToUrl(placeId);
+            _driver.Navigate().GoToUrl(placeUrl);
+
+            // Wait for initial load
+            await Task.Delay(2000);
+
+            // Handle consent
+            await HandleConsent();
+
+            // Wait for page to fully load
+            await Task.Delay(3000);
+
+            // Try to find and click the place card/marker that appears on the map
+            var placeCardSelectors = new[]
+            {
+                "a[href*='/maps/place/']",  // Link to place
+                "div[role='article']",       // Place card
+                "div.Nv2PK",                 // Search result card
+                "button[aria-label*='place']", // Place button
+                "div[jsaction*='mouseup']",  // Interactive place element
+                "a.hfpxzc"                   // Place link in sidebar
+            };
+
+            bool clickedPlace = false;
+            foreach (var selector in placeCardSelectors)
+            {
+                try
+                {
+                    var placeElement = _driver.FindElement(By.CssSelector(selector));
+                    if (placeElement != null && placeElement.Displayed)
+                    {
+                        _logger.LogInformation("Clicking place element with selector: {Selector}", selector);
+                        placeElement.Click();
+                        await Task.Delay(3000);
+                        clickedPlace = true;
+                        break;
+                    }
+                }
+                catch { }
+            }
+
+            if (!clickedPlace)
+            {
+                _logger.LogWarning("Could not find place card to click, trying to proceed with current page");
+            }
+
+            // Get the final URL after any redirects/clicks
+            var finalUrl = _driver.Url;
+            _logger.LogInformation("Final URL after Place ID navigation: {Url}", finalUrl);
+
+            // Now scrape reviews from the page
+            var reviews = await ScrapeReviewsAsync(finalUrl, options);
+
+            // Extract company info
+            var company = await ExtractCompanyInfoAsync(finalUrl);
+            if (company != null)
+            {
+                company.PlaceId = placeId;
+                company.Reviews = reviews;
+                company.GoogleMapsUrl = finalUrl;
+            }
+
+            return company;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error scraping reviews by Place ID");
             return null;
         }
     }
