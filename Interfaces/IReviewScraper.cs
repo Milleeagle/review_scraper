@@ -8,4 +8,5 @@ public interface IReviewScraper
     Task<List<Review>> ScrapeReviewsAsync(string googleMapsUrl, ScrapingOptions? options = null);
     Task<Company?> ScrapeCompanyWithReviewsAsync(string companyName, string? location = null, ScrapingOptions? options = null);
     Task<Company?> ExtractCompanyInfoAsync(string googleMapsUrl);
+    Task<Company?> ScrapeReviewsByPlaceIdAsync(string placeId, ScrapingOptions? options = null);
 }

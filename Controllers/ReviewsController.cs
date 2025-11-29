@@ -205,19 +205,14 @@ public class ReviewsController : ControllerBase
 
         try
         {
-            // Convert Place ID to Google Maps URL
-            var googleMapsUrl = $"https://www.google.com/maps/place/?q=place_id:{request.PlaceId}";
+            _logger.LogInformation("Scraping reviews for Place ID: {PlaceId}", request.PlaceId);
 
-            _logger.LogInformation("Converting Place ID {PlaceId} to URL: {Url}", request.PlaceId, googleMapsUrl);
+            var company = await _reviewScraper.ScrapeReviewsByPlaceIdAsync(request.PlaceId, request.Options);
 
-            var company = await _reviewScraper.ExtractCompanyInfoAsync(googleMapsUrl);
             if (company == null)
             {
-                return NotFound($"Could not find place with ID: {request.PlaceId}");
+                return NotFound($"Could not find or scrape place with ID: {request.PlaceId}");
             }
-
-            var reviews = await _reviewScraper.ScrapeReviewsAsync(googleMapsUrl, request.Options);
-            company.Reviews = reviews;
 
             return Ok(company);
         }
