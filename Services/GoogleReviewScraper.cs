@@ -773,6 +773,9 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
             }
             catch { }
 
+            // Detect country based on available information
+            company.Country = DetectCountry(company);
+
             return company;
         }
         catch (Exception ex)
@@ -780,6 +783,49 @@ public class GoogleReviewScraper : IReviewScraper, IDisposable
             _logger.LogError(ex, "Error extracting company info");
             return null;
         }
+    }
+
+    private string DetectCountry(Company company)
+    {
+        // Check address for Swedish cities
+        if (!string.IsNullOrEmpty(company.Address))
+        {
+            var swedishCities = new[] { "Stockholm", "Gothenburg", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro", "Linköping", "Helsingborg", "Jönköping", "Norrköping", "Lund", "Umeå", "Gävle", "Borås", "Eskilstuna", "Södertälje", "Karlstad", "Täby", "Växjö" };
+            if (swedishCities.Any(city => company.Address.Contains(city, StringComparison.OrdinalIgnoreCase)))
+            {
+                return "Sweden";
+            }
+
+            // Check for "Sweden" explicitly in address
+            if (company.Address.Contains("Sweden", StringComparison.OrdinalIgnoreCase) ||
+                company.Address.Contains("Sverige", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Sweden";
+            }
+        }
+
+        // Check phone number for Swedish prefix
+        if (!string.IsNullOrEmpty(company.PhoneNumber))
+        {
+            var cleanPhone = company.PhoneNumber.Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "");
+            if (cleanPhone.StartsWith("+46") || cleanPhone.StartsWith("0046") ||
+                (cleanPhone.StartsWith("0") && cleanPhone.Length == 10 && !cleanPhone.StartsWith("00")))
+            {
+                return "Sweden";
+            }
+        }
+
+        // Check website for .se domain
+        if (!string.IsNullOrEmpty(company.Website))
+        {
+            if (company.Website.Contains(".se/", StringComparison.OrdinalIgnoreCase) ||
+                company.Website.EndsWith(".se", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Sweden";
+            }
+        }
+
+        return "Unknown";
     }
 
     public async Task<Company?> ScrapeReviewsByPlaceIdAsync(string placeId, ScrapingOptions? options = null)

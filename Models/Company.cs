@@ -8,6 +8,7 @@ public class Company
     public string Website { get; set; } = string.Empty;
     public string GoogleMapsUrl { get; set; } = string.Empty;
     public string PlaceId { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
     public double? OverallRating { get; set; }
     public int? TotalReviews { get; set; }
     public string Category { get; set; } = string.Empty;
