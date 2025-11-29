@@ -9,6 +9,7 @@ This is a .NET 8 ASP.NET Core web application that provides a robust Google revi
 ## Core Features
 
 - **Company Search**: Find companies by name and location without requiring a Place ID
+- **Place ID Support**: Scrape reviews directly using Google Place IDs
 - **Comprehensive Review Scraping**: Extract more reviews than the Google Places API limit of 5
 - **Advanced Filtering**: Filter reviews by rating, date range, language, and more
 - **Clean API**: RESTful endpoints for easy integration with other projects
@@ -50,6 +51,8 @@ Once running, navigate to `/swagger` for full API documentation. Key endpoints:
 - `POST /api/reviews/scrape-company` - Scrape company with all reviews
 - `POST /api/reviews/scrape` - Scrape reviews from a specific Google Maps URL
 - `POST /api/reviews/scrape-from-url` - Extract company info and scrape reviews from Google Maps URL
+- `POST /api/reviews/scrape-by-place-id` - Scrape reviews using Google Place ID (NEW!)
+- `POST /api/reviews/scrape-multiple-place-ids` - Scrape multiple Place IDs in parallel
 - `GET /api/reviews/test-scrape?url={url}&maxReviews={count}` - Quick test endpoint
 - `POST /api/reviews/test-scrape-post` - Test scraping with POST body
 
@@ -90,20 +93,53 @@ var company = await scraper.ScrapeCompanyWithReviewsAsync("Company Name", "Locat
 ```
 
 ### API Usage
+
+**Scrape by Company Name:**
 ```bash
-curl -X POST "https://localhost:7296/api/reviews/scrape-company" \
+curl -X POST "http://localhost:5291/api/reviews/scrape-company" \
   -H "Content-Type: application/json" \
   -d '{"companyName": "Aerius Ventilation", "location": "Stockholm", "options": {"maxReviews": 20}}'
 ```
 
+**Scrape by Place ID:**
+```bash
+curl -X POST "http://localhost:5291/api/reviews/scrape-by-place-id" \
+  -H "Content-Type: application/json" \
+  -d '{"placeId": "ChIJoyABwO93X0YRc8HCOeQQSiE", "options": {"maxReviews": 10}}'
+```
+
+**Scrape Multiple Place IDs in Parallel:**
+```bash
+curl -X POST "http://localhost:5291/api/reviews/scrape-multiple-place-ids" \
+  -H "Content-Type: application/json" \
+  -d '{"placeIds": ["ChIJoyABwO93X0YRc8HCOeQQSiE", "ChIJ..."], "options": {"maxReviews": 10}}'
+```
+
+## Place ID Support
+
+The scraper now supports Google Place IDs directly! Use the `/api/reviews/scrape-by-place-id` endpoint to scrape reviews using Place IDs obtained from the Google Places API or other sources.
+
+**How it works:**
+1. Converts Place ID to Google Maps URL format
+2. Navigates to the Place ID URL
+3. Handles consent dialogs automatically
+4. Detects and clicks on the place card/marker to open the business page
+5. Scrapes reviews from the business detail page
+
+**Example Place ID:** `ChIJoyABwO93X0YRc8HCOeQQSiE` (A & B Hälsokost, Stockholm)
+
+**Important:** Place IDs must reference actual businesses with listings. Coordinate-only Place IDs without business pages will return 0 reviews.
+
+**Batch Processing:** Use `/api/reviews/scrape-multiple-place-ids` to scrape multiple Place IDs in parallel for better performance.
+
 ## Important Notes
 
 - **Chrome Driver**: Requires Chrome browser or ChromeDriver to be installed
-- **Google Maps URL Required**: The system expects direct Google Maps URLs - no company search functionality
-- **Reviews Sorted by Newest**: Automatically selects "Newest" from the sort dropdown to get most recent reviews first
+- **Reviews Sorted by Newest**: Automatically selects "Newest" from the sort dropdown to get most recent reviews first (currently disabled for stability)
 - **Rate Limiting**: Built-in delays between requests to avoid being blocked
 - **Headless Mode**: Runs Chrome in headless mode by default for server environments
 - **Error Handling**: Comprehensive logging and graceful error handling for unstable web scraping
+- **Review Extraction**: Currently extracts 3-6 reviews per location in ~27 seconds
 - **Scalability**: Consider implementing request queuing for high-volume usage
 
 ## Testing
@@ -127,8 +163,10 @@ The application uses standard ASP.NET Core configuration:
 Key request models used by the API:
 - `ScrapingOptions`: Configures scraping behavior (MaxReviews, MinRating, MaxRating, date filters, etc.)
 - `ScrapeReviewsRequest`: Contains GoogleMapsUrl and ScrapingOptions
-- `ScrapeCompanyRequest`: Contains CompanyName, Location, and ScrapingOptions  
+- `ScrapeCompanyRequest`: Contains CompanyName, Location, and ScrapingOptions
 - `ScrapeFromUrlRequest`: Contains GoogleMapsUrl and ScrapingOptions
+- `ScrapeByPlaceIdRequest`: Contains PlaceId and ScrapingOptions
+- `ScrapeMultiplePlaceIdsRequest`: Contains list of PlaceIds and ScrapingOptions
 - `TestScrapeRequest`: Simple test request with Url and MaxReviews
 
 ## Selenium Configuration
